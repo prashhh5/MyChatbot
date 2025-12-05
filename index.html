@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Sentiment Bot</title>
+    <style>
+        :root {
+            --bg-color: #e5ddd5;
+            --container-bg: #ffffff;
+            --text-color: #333;
+            --header-bg: #075e54;
+            --user-msg: #dcf8c6;
+            --bot-msg: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #111b21;
+            --container-bg: #202c33;
+            --text-color: #e9edef;
+            --header-bg: #202c33;
+            --user-msg: #005c4b;
+            --bot-msg: #202c33;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; transition: 0.3s; }
+        
+        .chat-container { width: 380px; height: 650px; background: var(--container-bg); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid #ccc; }
+        
+        /* Header & Toggle */
+        .header { background-color: var(--header-bg); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .toggle-btn { background: none; border: 1px solid white; color: white; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 0.8rem; }
+        
+        /* Sentiment Meter */
+        .sentiment-dashboard { padding: 10px; background: rgba(0,0,0,0.05); text-align: center; font-size: 0.8rem; color: var(--text-color); border-bottom: 1px solid #ddd; }
+        .meter-bg { width: 100%; height: 10px; background: #ddd; border-radius: 5px; margin-top: 5px; overflow: hidden; position: relative; }
+        .meter-fill { height: 100%; width: 50%; background: #ffc107; transition: width 0.5s ease, background 0.5s ease; position: absolute; left: 0; }
+        #sentiment-text { font-weight: bold; }
+
+        /* Chat Area */
+        #chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-blend-mode: overlay; background-color: var(--container-bg); }
+        
+        .message { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; position: relative; color: var(--text-color); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .user { align-self: flex-end; background-color: var(--user-msg); border-bottom-right-radius: 2px; }
+        .bot { align-self: flex-start; background-color: var(--bot-msg); border-bottom-left-radius: 2px; }
+        .time { font-size: 0.65rem; color: #999; text-align: right; margin-top: 4px; }
+
+        /* Input Area */
+        .input-area { padding: 10px; background-color: var(--container-bg); display: flex; gap: 8px; align-items: center; }
+        input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; background: var(--bg-color); color: var(--text-color); outline: none; }
+        button { width: 45px; height: 45px; border-radius: 50%; border: none; background-color: #00a884; color: white; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        button:hover { background-color: #008f6f; }
+
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="header">
+            <span>🤖 AI Sentiment Bot</span>
+            <button class="toggle-btn" onclick="toggleTheme()">🌙</button>
+        </div>
+
+        <div class="sentiment-dashboard">
+            Detected Mood: <span id="sentiment-text">Waiting...</span>
+            <div class="meter-bg">
+                <div class="meter-fill" id="meter-bar" style="width: 50%;"></div>
+            </div>
+        </div>
+
+        <div id="chat-box">
+            <div class="message bot">
+                Hello! I analyze the sentiment of your text. Try me!
+                <div class="time">Just now</div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type a message..." onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+        function handleEnter(event) { if (event.key === "Enter") sendMessage(); }
+        
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute("data-theme");
+            document.documentElement.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+        }
+
+        function getCurrentTime() {
+            const now = new Date();
+            return now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("user-input");
+            const chatBox = document.getElementById("chat-box");
+            const meterBar = document.getElementById("meter-bar");
+            const sentimentText = document.getElementById("sentiment-text");
+            const text = input.value.trim();
+
+            if (text === "") return;
+
+            // 1. Show User Message
+            chatBox.innerHTML += `
+                <div class="message user">
+                    ${text}
+                    <div class="time">${getCurrentTime()}</div>
+                </div>`;
+            input.value = "";
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 2. Send to Python
+            try {
+                const response = await fetch("/send_message", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                
+                // 3. Show Bot Message
+                chatBox.innerHTML += `
+                    <div class="message bot">
+                        ${data.reply}
+                        <div class="time">${getCurrentTime()}</div>
+                    </div>`;
+                
+                // 4. UPDATE THE SENTIMENT METER (This is the Winning Feature)
+                sentimentText.innerText = `${data.sentiment} (${data.score.toFixed(2)})`;
+                
+                // Math to convert -1 to 1 score into 0% to 100% width
+                // -1 (Bad) = 0%, 0 (Neutral) = 50%, 1 (Good) = 100%
+                let percentage = ((data.score + 1) / 2) * 100;
+                meterBar.style.width = percentage + "%";
+
+                // Change Color based on score
+                if (data.score >= 0.05) {
+                    meterBar.style.background = "#4caf50"; // Green
+                } else if (data.score <= -0.05) {
+                    meterBar.style.background = "#f44336"; // Red
+                } else {
+                    meterBar.style.background = "#ffc107"; // Yellow
+                }
+
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    </script>
+
+</body>
+</html>
+
+
